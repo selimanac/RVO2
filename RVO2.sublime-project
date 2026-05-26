@@ -14,10 +14,26 @@
 			"focus": true
 		},
 		{
+			"name": "Clean Configure (OpenMP)",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "rm -rf ./build/* ./bin/* && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_RAYLIB_EXAMPLE=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_OPENMP=ON -DOpenMP_CXX_FLAGS=\"-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include\" -DOpenMP_CXX_LIB_NAMES=omp -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib -S . -B ./build",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
 			"name": "Configure",
 			"target": "terminus_exec",
 			"cancel": "terminus_cancel_build",
 			"shell_cmd": "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_RAYLIB_EXAMPLE=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S . -B ./build",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "Configure (OpenMP)",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_RAYLIB_EXAMPLE=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_OPENMP=ON -DOpenMP_CXX_FLAGS=\"-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include\" -DOpenMP_CXX_LIB_NAMES=omp -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib -S . -B ./build",
 			"working_dir": "${project_path}",
 			"focus": true
 		},

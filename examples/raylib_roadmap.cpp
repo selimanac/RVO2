@@ -195,7 +195,7 @@ static void setupScenario(RVO::RVOSimulator*          sim,
     v.position = RVO::Vector2(42.0f, 42.0f);
     roadmap.push_back(v);
 
-    sim->setAgentDefaults(15.0f, 10U, 5.0f, 5.0f, 2.0f, 2.0f);
+    sim->setAgentDefaults(15.0f, 10U, 5.0f, 5.0f, 2.0f, 12.0f);
 
     for (std::size_t i = 0U; i < 5U; ++i)
     {

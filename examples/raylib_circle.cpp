@@ -4,7 +4,7 @@
 static const int   SCREEN_W = 1920;
 static const int   SCREEN_H = 1280;
 
-static const int   NUM_AGENTS = 100;
+static const int   NUM_AGENTS = 1500;
 static const float RVO_TWO_PI = 6.28318530717958647692f;
 static const float FORM_RADIUS = 2400.0f; // world units — gap ~40 units per agent (matches original Circle.cc spacing ratio)
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ static void setupScenario(RVO::RVOSimulator* sim, std::vector<RVO::Vector2>& goa
 {
     goals.clear();
     sim->setTimeStep(0.55f);
-    sim->setAgentDefaults(1260.0f, 15U, 20.0f, 1.0f, 30.0f, 10.0f); // You don't — with no obstacles it has zero effect on behavior. But the code computes 1.0F / timeHorizonObst_ unconditionally, so passing 0 produces +Infinity. Set any positive number (e.g. 1.0f) and it's safely ignored.
+    sim->setAgentDefaults(380.0f, 5U, 20.0f, 1.0f, 30.0f, 20.0f); // You don't — with no obstacles it has zero effect on behavior. But the code computes 1.0F / timeHorizonObst_ unconditionally, so passing 0 produces +Infinity. Set any positive number (e.g. 1.0f) and it's safely ignored.
 
     for (std::size_t i = 0; i < (std::size_t)NUM_AGENTS; ++i)
     {
@@ -45,8 +45,16 @@ static bool reachedGoal(RVO::RVOSimulator*               sim,
     {
         float r = sim->getAgentRadius(i);
         if (RVO::absSq(sim->getAgentPosition(i) - goals[i]) > r * r)
+        {
             return false;
+        }
+        else
+        {
+            printf("SET FUCK\n");
+            sim->setAgentVelocity(i, RVO::Vector2());
+        }
     }
+
     return true;
 }
 
@@ -75,7 +83,7 @@ int main()
     InitWindow(SCREEN_W, SCREEN_H, "FABRIK-C");
 
     // Camera
-    Camera2D camera = { { SCREEN_W / 2.0f, SCREEN_H / 2.0f }, { 0.0f, 0.0f }, 0.0f, 0.4f };
+    Camera2D camera = { { SCREEN_W / 2.0f, SCREEN_H / 2.0f }, { 0.0f, 0.0f }, 0.0f, 0.2f };
 
     // Textures
     Texture2D agent_texture = LoadTexture("bin/resources/agent.png");
@@ -122,6 +130,7 @@ int main()
             if (goalCheckCtr >= 30)
             {
                 goalCheckCtr = 0;
+
                 if (reachedGoal(sim, goals))
                 {
                     goalReached = true;

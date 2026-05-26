@@ -50,6 +50,10 @@
 #include <cstdint>
 #include <vector>
 #include <random>
+
+#if _OPENMP
+#include <omp.h>
+#endif /* _OPENMP */
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -273,7 +277,9 @@ int main()
         // ---- Sim step ----------------------------------------------------
 
         double t0 = GetTime();
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif /* _OPENMP */
         for (std::size_t i = 0; i < units.size(); ++i)
         {
             /*   if (!units[i].hasGoal)

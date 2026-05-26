@@ -19,6 +19,9 @@
 #include <cstddef>
 #include <vector>
 #include <random>
+#if _OPENMP
+#include <omp.h>
+#endif /* _OPENMP */
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -54,7 +57,8 @@ static std::vector<float> enemyRotations;
 static bool               followPlayer = false;
 
 const float               unit_sizes[4] = { 20, 30, 40, 60 };
-const float               unit_speeds[4] = { 700, 600, 500, 400 };
+const float               unit_speeds[4] = { 450, 400, 340, 280 };
+std::size_t               max_neighbors[4] = { 6, 15, 20, 25 };
 std::random_device        rd;
 std::mt19937              gen(rd());
 
@@ -64,12 +68,12 @@ std::mt19937              gen(rd());
 static void setupSim()
 {
     sim->setAgentDefaults(
-    ENEMY_SPEED * 3.0f + 2.0f * PLAYER_RADIUS, // neighborDist (formula)
-    5U,                                        // maxNeighbors
-    3.0f,                                      // timeHorizon
-    1.0f,                                      // timeHorizonObst
-    PLAYER_RADIUS,                             // radius
-    PLAYER_SPEED * 2.0f                        // maxSpeed (high — we override position)
+    PLAYER_RADIUS * 8.0f + 150.0f, // neighborDist
+    5U,                            // maxNeighbors
+    3.0f,                          // timeHorizon
+    1.0f,                          // timeHorizonObst
+    PLAYER_RADIUS,                 // radius
+    PLAYER_SPEED * 2.0f            // maxSpeed (high — we override position)
     );
     playerIdx = sim->addAgent(playerPos);
 }
@@ -83,7 +87,7 @@ static void spawnEnemies(int count)
     // Minimum circle radius for non-overlapping placement
 
     sim->setAgentDefaults(
-    ENEMY_SPEED * 3.0f + 2.0f * ENEMY_RADIUS, // neighborDist = 340
+    ENEMY_RADIUS * 8.0f + 150.0f, // neighborDist
     5U,
     3.0f,
     1.0f,
@@ -103,7 +107,9 @@ static void spawnEnemies(int count)
 
         float       angle = (2.0f * 3.14159265f) * static_cast<float>(i) / static_cast<float>(count);
 
-        std::size_t idx = sim->addAgent(RVO::Vector2(cosf(angle) * spawnRadius, sinf(angle) * spawnRadius), unit_speed * 3.0f + 2.0f * unit_radius, 30U, 10.f, 1.0f, unit_radius, unit_speed);
+        std::size_t max_neighbor = max_neighbors[random_num];
+
+        std::size_t idx = sim->addAgent(RVO::Vector2(cosf(angle) * spawnRadius, sinf(angle) * spawnRadius), unit_radius * 8.0f + 150.0f, static_cast<size_t>(max_neighbor), 3.0f, 1.0f, unit_radius, unit_speed);
 
         Unit        u;
         u.simIdx = idx;
@@ -137,20 +143,20 @@ int main()
     sim = new RVO::RVOSimulator();
     setupSim();
 
-    double simMs = 0.0;
-    double drawMs = 0.0;
+    double      simMs = 0.0;
+    double      drawMs = 0.0;
+    float       avgAgentNeighbors = 0.0f;
+    std::size_t maxAgentNeighborsSeen = 0;
 
     // LOOP
     while (!WindowShouldClose())
     {
-        // Clamp dt: guard against first-frame zero and low-fps instability.
-        // maxSpeed * dt / radius must stay well below 1 for stable ORCA.
-        // At ENEMY_SPEED=200, ENEMY_RADIUS=20: limit is dt < 0.1 (10fps).
-        // Clamping to 0.05 (20fps) keeps the ratio at 0.5 — a safe margin.
+        // Use fixed sim timestep for stable ORCA behaviour regardless of frame rate.
+        // Player movement still uses the actual frame time.
         float dt = GetFrameTime();
         if (dt <= 0.0f || dt > 0.05f)
             dt = 0.016f;
-        sim->setTimeStep(dt);
+        sim->setTimeStep(1.0f / 60.0f);
 
         // ---- Input -------------------------------------------------------
 
@@ -195,76 +201,81 @@ int main()
 
         double t0 = GetTime();
 
-        // Player pref velocity = zero (position is overridden after doStep)
+        // Update player in sim BEFORE enemies compute ORCA constraints,
+        // so neighbours avoid the current player state not last frame's.
+        playerPos = newPlayerPos;
+        RVO::Vector2 playerVel = isMoving ? moveDir * PLAYER_SPEED : RVO::Vector2(0.0f, 0.0f);
+        sim->setAgentPosition(playerIdx, playerPos);
+        sim->setAgentVelocity(playerIdx, playerVel);
         sim->setAgentPrefVelocity(playerIdx, RVO::Vector2(0.0f, 0.0f));
 
         // Enemy preferred velocities
         std::size_t totalAgents = sim->getNumAgents();
-        for (std::size_t i = 1; i < totalAgents; ++i)
+        int         totalAgentsInt = static_cast<int>(totalAgents);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif /* _OPENMP */
+        for (int i = 1; i < totalAgentsInt; ++i)
         {
-            RVO::Vector2 enemyPos = sim->getAgentPosition(i);
+            RVO::Vector2 enemyPos = sim->getAgentPosition(static_cast<std::size_t>(i));
             RVO::Vector2 toPlayer = playerPos - enemyPos;
             float        distSq = RVO::absSq(toPlayer);
 
             if (followPlayer)
             {
                 // Arrival behaviour: decelerate smoothly into a stop ring at
-                // physical contact distance (player_r + enemy_r).  This lets
-                // ORCA distribute enemies around the perimeter naturally instead
-                // of all crowding toward the exact same point at full speed.
-                float stopDist = PLAYER_RADIUS + units[i - 1].unit_radius * 2; // ~60 units — touch the player
-                float slowDist = stopDist + units[i - 1].unit_radius * 5.0f;   // ~160 units — start braking
+                // physical contact distance (player_r + enemy_r).
+                float stopDist = PLAYER_RADIUS + units[i - 1].unit_radius * 2.0f;
+                float slowDist = stopDist + units[i - 1].unit_radius * 5.0f;
                 float dist = sqrtf(distSq);
 
                 if (dist <= stopDist)
                 {
-                    sim->setAgentPrefVelocity(i, RVO::Vector2(0.0f, 0.0f));
+                    // Inside ring: tiny outward nudge so ORCA can blend crowd
+                    // pressure naturally — avoids hard-stop vs ORCA oscillation.
+                    if (distSq > 0.0001f)
+                        sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::normalize(enemyPos - playerPos) * (units[i - 1].unit_speed * 0.1f));
+                    else
+                        sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::Vector2(0.0f, 0.0f));
                 }
                 else if (dist < slowDist)
                 {
                     float t = (dist - stopDist) / (slowDist - stopDist); // 0..1
-                    sim->setAgentPrefVelocity(i, RVO::normalize(toPlayer) * units[i - 1].unit_speed * t);
+                    sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::normalize(toPlayer) * units[i - 1].unit_speed * t);
                 }
                 else
                 {
-                    sim->setAgentPrefVelocity(i, RVO::normalize(toPlayer) * units[i - 1].unit_speed);
+                    sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::normalize(toPlayer) * units[i - 1].unit_speed);
                 }
             }
             else
             {
-                // When idle: drift away from player if within 5× radius.
-                // Gives ORCA a non-zero velocity to work with so separation
-                // and player-push effects can be computed.
-                float repelRange = units[i].unit_radius * 100.0f;
+                // When idle: drift away from player if within repel range.
+                float repelRange = units[i - 1].unit_radius * 100.0f;
                 if (distSq < repelRange * repelRange && distSq > 0.0001f)
-                    sim->setAgentPrefVelocity(i, RVO::normalize(enemyPos - playerPos) * (units[i].unit_speed * 0.3f));
+                    sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::normalize(enemyPos - playerPos) * (units[i - 1].unit_speed * 0.3f));
                 else
-                    sim->setAgentPrefVelocity(i, RVO::Vector2(0.0f, 0.0f));
+                    sim->setAgentPrefVelocity(static_cast<std::size_t>(i), RVO::Vector2(0.0f, 0.0f));
             }
         }
 
         sim->doStep();
 
-        // Hard-stop: force-zero velocity for enemies that reached the arrival
-        // zone.  prefVel=0 alone is not enough — ORCA still produces non-zero
-        // velocities when surrounding enemies push inward.  Overriding after
-        // doStep() guarantees they stay put.
-        if (followPlayer)
+        // Re-assert player position/velocity after doStep (ORCA may drift it).
+        sim->setAgentPosition(playerIdx, playerPos);
+        sim->setAgentVelocity(playerIdx, playerVel);
+
+        std::size_t totalAgentNeighbors = 0;
+        maxAgentNeighborsSeen = 0;
+        for (std::size_t i = 0; i < totalAgents; ++i)
         {
-            float stopDist = PLAYER_RADIUS + ENEMY_RADIUS * 2.0f;
-            float stopDistSq = stopDist * stopDist;
-            for (std::size_t i = 1; i < totalAgents; ++i)
-            {
-                RVO::Vector2 toP = playerPos - sim->getAgentPosition(i);
-                if (RVO::absSq(toP) <= stopDistSq)
-                    sim->setAgentVelocity(i, RVO::Vector2(0.0f, 0.0f));
-            }
+            std::size_t n = sim->getAgentNumAgentNeighbors(i);
+            totalAgentNeighbors += n;
+            if (n > maxAgentNeighborsSeen)
+                maxAgentNeighborsSeen = n;
         }
 
-        // Override player position and velocity — bypasses ORCA for player
-        playerPos = newPlayerPos;
-        sim->setAgentPosition(playerIdx, playerPos);
-        sim->setAgentVelocity(playerIdx, isMoving ? moveDir * PLAYER_SPEED : RVO::Vector2(0.0f, 0.0f));
+        avgAgentNeighbors = totalAgents > 0 ? (float)totalAgentNeighbors / (float)totalAgents : 0.0f;
 
         // Camera tracks player
         camera.target = { playerPos.x(), playerPos.y() };
@@ -291,7 +302,7 @@ int main()
             if (RVO::abs(vel) > 0.1f)
                 enemyRotations[i - 1] = atan2f(vel.y(), vel.x()) * RAD2DEG;
 
-            float escale = (units[i].unit_radius * 2.0f) / ew; // scale texture to match diameter
+            float escale = (units[i - 1].unit_radius * 2.0f) / ew; // scale texture to match diameter
             float dw = ew * escale;
             float dh = eh * escale;
             DrawTexturePro(
@@ -320,8 +331,23 @@ int main()
         EndMode2D();
 
         // HUD
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Enemies: %zu\nFollow: %s\nSim: %.2fms\nDraw: %.2fms\n[SPACE] spawn  [F] follow  [Arrows] move", enemyCount, followPlayer ? "ON" : "OFF", simMs, drawMs);
+        char buf[256];
+#ifdef _OPENMP
+        int  ompThreads = omp_get_max_threads();
+#else
+        int  ompThreads = 1;
+#endif /* _OPENMP */
+        snprintf(
+        buf,
+        sizeof(buf),
+        "Enemies: %zu\nFollow: %s\nSim: %.2fms\nDraw: %.2fms\nNeighbors avg/max: %.1f/%zu\nThreads: %d\n[SPACE] spawn  [F] follow  [Arrows] move",
+        enemyCount,
+        followPlayer ? "ON" : "OFF",
+        simMs,
+        drawMs,
+        avgAgentNeighbors,
+        maxAgentNeighborsSeen,
+        ompThreads);
         DrawFPS(10, 10);
         DrawText(buf, 10, 40, 18, Color { 200, 200, 210, 255 });
 
