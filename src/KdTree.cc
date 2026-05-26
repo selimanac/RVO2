@@ -178,6 +178,11 @@ void KdTree::buildAgentTree() {
   }
 }
 
+void KdTree::resetAgents() {
+  agents_.clear();
+  agentTree_.clear();
+}
+
 void KdTree::buildAgentTreeRecursive(std::size_t begin, std::size_t end,
                                      std::size_t node) {
   agentTree_[node].begin = begin;

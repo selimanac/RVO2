@@ -41,6 +41,13 @@ project(RVO
   HOMEPAGE_URL https://gamma.cs.unc.edu/RVO2/
   LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/external" CACHE PATH
+  "Location for downloaded dependencies")
+
+include(FetchContent)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   # cmake-lint: disable=C0301
   set(CMAKE_BUILD_TYPE Release CACHE STRING
@@ -71,7 +78,7 @@ set(RVO_LIBRARY RVO)
 
 set(RVO_NAME "RVO2 Library")
 
-set(CMAKE_CXX_STANDARD 98)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -282,6 +289,98 @@ if(WARNINGS_AS_ERRORS)
 endif()
 
 option(ENABLE_INSTALLATION "Enable installation" ${PROJECT_IS_TOP_LEVEL})
+
+# ============================================================================
+# Defold SDK (Optional)
+# Downloads the latest stable SDK automatically into external/
+# ============================================================================
+option(ENABLE_DEFOLD_SDK "Download and expose Defold SDK headers" OFF)
+
+if(ENABLE_DEFOLD_SDK)
+  message(STATUS "Fetching Defold SDK version information...")
+
+  set(RVO_DEFOLD_INFO_URL "http://d.defold.com/stable/info.json")
+  set(RVO_DEFOLD_INFO_FILE "${CMAKE_BINARY_DIR}/defold_info.json")
+
+  file(DOWNLOAD ${RVO_DEFOLD_INFO_URL} ${RVO_DEFOLD_INFO_FILE}
+    STATUS RVO_DEFOLD_DOWNLOAD_STATUS
+    TIMEOUT 10)
+
+  list(GET RVO_DEFOLD_DOWNLOAD_STATUS 0 RVO_DEFOLD_STATUS_CODE)
+
+  if(NOT RVO_DEFOLD_STATUS_CODE EQUAL 0)
+    message(WARNING
+      "Failed to fetch Defold version info. Falling back to 1.11.1")
+    set(RVO_DEFOLD_VERSION "1.11.1")
+  else()
+    file(READ ${RVO_DEFOLD_INFO_FILE} RVO_DEFOLD_INFO_CONTENT)
+    string(REGEX MATCH
+      "\"version\"[ ]*:[ ]*\"([0-9]+\\.[0-9]+\\.[0-9]+)\""
+      _ ${RVO_DEFOLD_INFO_CONTENT})
+    set(RVO_DEFOLD_VERSION ${CMAKE_MATCH_1})
+
+    if(NOT RVO_DEFOLD_VERSION)
+      message(WARNING
+        "Failed to parse Defold version. Falling back to 1.11.1")
+      set(RVO_DEFOLD_VERSION "1.11.1")
+    else()
+      message(STATUS "Detected Defold SDK version: ${RVO_DEFOLD_VERSION}")
+    endif()
+  endif()
+
+  FetchContent_Declare(defoldsdk
+    URL
+      "https://github.com/defold/defold/releases/download/${RVO_DEFOLD_VERSION}/defoldsdk.zip"
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+
+  FetchContent_MakeAvailable(defoldsdk)
+  message(STATUS "Defold SDK downloaded to: ${defoldsdk_SOURCE_DIR}")
+
+  set(RVO_DEFOLD_SDK_INCLUDE_DIR "${defoldsdk_SOURCE_DIR}/sdk/include")
+  set(RVO_DEFOLD_SRC_INCLUDE_DIR "${defoldsdk_SOURCE_DIR}/include")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/x86_64-linux")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/arm64-linux")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/arm64-macos")
+    else()
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/x86_64-macos")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/x86_64-win32")
+    else()
+      set(RVO_DEFOLD_SDK_LIB_DIR
+        "${defoldsdk_SOURCE_DIR}/lib/win32")
+    endif()
+  else()
+    message(WARNING
+      "Unsupported platform for Defold SDK: "
+      "${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}. "
+      "Defaulting to x86_64-linux library path.")
+    set(RVO_DEFOLD_SDK_LIB_DIR
+      "${defoldsdk_SOURCE_DIR}/lib/x86_64-linux")
+  endif()
+
+  message(STATUS
+    "Using Defold SDK library directory: ${RVO_DEFOLD_SDK_LIB_DIR}")
+endif()
+
+# ============================================================================
+# Raylib (Optional)
+# Requires the libs/raylib submodule to be initialized
+# ============================================================================
+option(ENABLE_RAYLIB_EXAMPLE "Build raylib visualization examples" OFF)
 
 add_subdirectory(src)
 add_subdirectory(examples)

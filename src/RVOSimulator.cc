@@ -152,6 +152,25 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position, float neighborDist,
   return agents_.size() - 1U;
 }
 
+std::size_t RVOSimulator::removeAgent(std::size_t agentNo) {
+  if (agentNo >= agents_.size()) {
+    return RVO_ERROR;
+  }
+
+  delete agents_[agentNo];
+
+  if (agentNo != agents_.size() - 1U) {
+    agents_[agentNo] = agents_.back();
+    agents_[agentNo]->id_ = agentNo;
+  }
+
+  agents_.pop_back();
+
+  kdTree_->resetAgents();
+
+  return agents_.size();
+}
+
 std::size_t RVOSimulator::addObstacle(const std::vector<Vector2> &vertices) {
   if (vertices.size() > 1U) {
     const std::size_t obstacleNo = obstacles_.size();

@@ -170,6 +170,12 @@ class KdTree {
                                 float radius,
                                 const ObstacleTreeNode *node) const;
 
+  /**
+   * @brief Clears the agent k-D tree and the agent list so that it is fully
+   *        rebuilt on the next call to buildAgentTree().
+   */
+  void resetAgents();
+
   /* Not implemented. */
   KdTree(const KdTree &other);
 

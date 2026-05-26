@@ -1,8 +1,8 @@
-# -*- mode: gitignore; -*-
-# vi: set ft=gitignore:
+# -*- mode: yaml; -*-
+# vi: set ft=yaml:
 
 #
-# .gitignore
+# .clang-tidy
 # RVO2 Library
 #
 # SPDX-FileCopyrightText: 2008 University of North Carolina at Chapel Hill
@@ -34,15 +34,38 @@
 # <https://gamma.cs.unc.edu/RVO2/>
 #
 
-/_build/
-/.idea/
-/.user.bazelrc
-/.venv/
-/bazel-*
-/cmake-build-*/
-/CMakeUserPresets.json
-/MODULE.bazel.lock
-/bin
-/build
-/external
-/libs
+---
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  clang-diagnostic-*,
+  cppcoreguidelines-*,
+  google-*,
+  misc-*,
+  openmp-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -cert-msc30-c,
+  -cert-msc32-c,
+  -cert-msc50-cpp,
+  -cert-msc51-cpp,
+  -clang-analyzer-security.insecureAPI.rand,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -misc-no-recursion,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-magic-numbers
+
+CheckOptions:
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: 1
+
+FormatStyle: file
+
+HeaderFilterRegex: '.*'
+
+WarningsAsErrors: '*'

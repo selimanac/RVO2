@@ -36,6 +36,14 @@
 
 option(BUILD_EXAMPLES "Build examples" ${PROJECT_IS_TOP_LEVEL})
 
+if(BUILD_EXAMPLES OR ENABLE_RAYLIB_EXAMPLE)
+  add_custom_target(copy_resources ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      ${CMAKE_SOURCE_DIR}/examples/resources
+      ${CMAKE_SOURCE_DIR}/bin/resources
+    COMMENT "Copying resources to bin/resources")
+endif()
+
 if(BUILD_EXAMPLES)
   option(OUTPUT_TIME_AND_POSITIONS "Output time and positions" ON)
 
@@ -118,4 +126,42 @@ if(BUILD_EXAMPLES)
   set_tests_properties(Roadmap PROPERTIES
     LABELS medium
     TIMEOUT 60)
+endif()
+
+if(ENABLE_RAYLIB_EXAMPLE)
+  if(NOT EXISTS "${CMAKE_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
+    message(FATAL_ERROR
+      "Raylib submodule not initialized. Please run:\n"
+      "  git submodule update --init --recursive")
+  endif()
+
+  set(RVO_PREV_BUILD_EXAMPLES ${BUILD_EXAMPLES})
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+
+  if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 NEW)
+  endif()
+
+  set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/libs/raylib
+    ${CMAKE_BINARY_DIR}/libs/raylib)
+  set(BUILD_EXAMPLES ${RVO_PREV_BUILD_EXAMPLES} CACHE BOOL "" FORCE)
+  set(CMAKE_WARN_DEPRECATED ON CACHE BOOL "" FORCE)
+
+  function(add_rvo_raylib_example target_name source_file)
+    add_executable(${target_name} ${source_file})
+    target_link_libraries(${target_name} PRIVATE ${RVO_LIBRARY} raylib)
+    set_target_properties(${target_name} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+  endfunction()
+
+  file(GLOB RVO_RAYLIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/raylib_*.cpp")
+
+  foreach(RVO_RAYLIB_SOURCE ${RVO_RAYLIB_SOURCES})
+    get_filename_component(RVO_RAYLIB_TARGET ${RVO_RAYLIB_SOURCE} NAME_WE)
+    add_rvo_raylib_example(${RVO_RAYLIB_TARGET} ${RVO_RAYLIB_SOURCE})
+    message(STATUS "  Adding raylib example: ${RVO_RAYLIB_TARGET}")
+  endforeach()
 endif()

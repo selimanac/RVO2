@@ -1,0 +1,108 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"build_systems": [
+		{
+			"name": "Clean Configure",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "rm -rf ./build/* ./bin/* && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_RAYLIB_EXAMPLE=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S . -B ./build",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "Configure",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_RAYLIB_EXAMPLE=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S . -B ./build",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "Build",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cmake --build build",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_circle.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_circle",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_roadmap.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_roadmap",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_blocks.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_blocks",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_test.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_test",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_follow.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_follow",
+			"working_dir": "${project_path}",
+			"focus": true
+		},
+		{
+			"name": "raylib_movement.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_movement",
+			"working_dir": "${project_path}",
+			"focus": true
+		}
+	],
+	"debugger_tasks": [
+		{
+			"name": "Compile",
+			"working_dir": "${project_path}",
+			"shell_cmd": "cmake -DCMAKE_BUILD_TYPE=Debug   -S . -B ./build ",
+			"file_regex": "(..[^:]*):([0-9]+):([0-9]+)?:? error: (.*)",
+		},
+	],
+	"debugger_configurations": [
+		{
+			"name": "C++ (Console)",
+			"type": "lldb",
+			"request": "launch",
+			"pre_debug_task": "Compile",
+			"program": "${project_path}/bin/raylib_navmesh_buffer",
+			"cwd": "${project_path}/build",
+			"terminal": "console",
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Launch",
+			"program": "^\"${folder}/bin/raylib_navmesh_buffer\"",
+			"args": [],
+			"cwd": "^\"${folder}\"",
+		},
+	],
+}

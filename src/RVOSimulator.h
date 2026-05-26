@@ -246,6 +246,19 @@ class RVO_EXPORT RVOSimulator {
                        const Vector2 &velocity);
 
   /**
+   * @brief     Removes the agent with the specified number from the simulation.
+   * @param[in] agentNo The number of the agent to be removed.
+   * @return    The new total number of agents, or RVO::RVO_ERROR if agentNo is
+   *            out of range.
+   * @note      This operation uses swap-and-pop for O(1) removal. The agent
+   *            that was at the last index before this call is moved to index
+   *            @p agentNo. Any stored index pointing to the former last agent
+   *            must be updated to @p agentNo. The caller can compute the old
+   *            last index as getNumAgents() - 1U before calling this function.
+   */
+  std::size_t removeAgent(std::size_t agentNo);
+
+  /**
    * @brief     Adds a new obstacle to the simulation.
    * @param[in] vertices List of the vertices of the polygonal obstacle in
    *                     counterclockwise order.
