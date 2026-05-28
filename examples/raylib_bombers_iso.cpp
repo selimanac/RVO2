@@ -48,6 +48,14 @@ std::mt19937             gen(rd());
 const float              BOMB_RADIUS = 360.0f;
 const float              BOMB_FORCE = 82.0f;
 const float              BOMB_DURATION = 20.45f;
+const float              TURRENT_FIRE_INTERVAL = 0.2f;
+const float              TURRENT_HIT_RADIUS = 55.0f;
+const float              TURRENT_KNOCKBACK_FORCE = 55.0f;
+const float              TURRENT_KNOCKBACK_DURATION = 3.2f;
+const RVO::Vector2       TURRENT_1_POSITION(2232.0f, 900.0f);
+const RVO::Vector2       TURRENT_1_TARGET(1992.0f, 732.0f);
+const RVO::Vector2       TURRENT_2_POSITION(2124.0f, 2034.0f);
+const RVO::Vector2       TURRENT_2_TARGET(1944.0f, 1612.0f);
 
 // STATS
 double simMs = 0.0;
@@ -113,6 +121,59 @@ static void AddBombImpact()
     }
 }
 
+static void ApplyKnockback(Unit& enemy, const RVO::Vector2& direction, float force, float duration)
+{
+    enemy.knockback = RVO::normalize(direction) * force;
+    enemy.knockbackTime = duration;
+    sim->setAgentVelocity(enemy.simIdx, enemy.knockback);
+    sim->setAgentMaxSpeed(enemy.simIdx, std::max(enemy.unit_speed, force));
+}
+
+static void FireTurrent(const RVO::Vector2& turrentPosition, const RVO::Vector2& targetPosition)
+{
+    const RVO::Vector2 fireDirection = targetPosition - turrentPosition;
+    float              bestDistSq = TURRENT_HIT_RADIUS * TURRENT_HIT_RADIUS;
+    Unit*              target = NULL;
+
+    for (Unit& enemy : enemies)
+    {
+        const RVO::Vector2 enemyPos = sim->getAgentPosition(enemy.simIdx);
+        const float        distSq = RVO::absSq(enemyPos - targetPosition);
+
+        if (distSq < bestDistSq)
+        {
+            bestDistSq = distSq;
+            target = &enemy;
+        }
+    }
+
+    if (target != NULL)
+    {
+        ApplyKnockback(*target, fireDirection, TURRENT_KNOCKBACK_FORCE, TURRENT_KNOCKBACK_DURATION);
+    }
+}
+
+static void UpdateTurrents(float dt)
+{
+    static float turrent1Cooldown = 0.0f;
+    static float turrent2Cooldown = 0.0f;
+
+    turrent1Cooldown -= dt;
+    turrent2Cooldown -= dt;
+
+    if (turrent1Cooldown <= 0.0f)
+    {
+        FireTurrent(TURRENT_1_POSITION, TURRENT_1_TARGET);
+        turrent1Cooldown = TURRENT_FIRE_INTERVAL;
+    }
+
+    if (turrent2Cooldown <= 0.0f)
+    {
+        FireTurrent(TURRENT_2_POSITION, TURRENT_2_TARGET);
+        turrent2Cooldown = TURRENT_FIRE_INTERVAL;
+    }
+}
+
 static void spawnEnemies(int count)
 {
     for (int i = 0; i < count; ++i)
@@ -149,7 +210,7 @@ static void spawnEnemies(int count)
 
 static void setupScenario()
 {
-    sim->setTimeStep(0.30f);
+    sim->setTimeStep(0.45f);
 
     // --- Generated RVO2 Boundary Vertices (Raylib Y-Down) ---
 
@@ -275,7 +336,7 @@ static void DrawTurrents()
     0.f,
     WHITE);
 
-    DrawLineEx({ 2124, 2034 }, { 1944, 1612 }, 1, GREEN);
+    DrawLineEx({ TURRENT_2_POSITION.x(), TURRENT_2_POSITION.y() }, { TURRENT_2_TARGET.x(), TURRENT_2_TARGET.y() }, 1, GREEN);
 
     DrawTexturePro(
     turrent_1_texture,
@@ -285,7 +346,7 @@ static void DrawTurrents()
     0.f,
     WHITE);
 
-    DrawLineEx({ 2232, 900 }, { 1992, 732 }, 1, GREEN);
+    DrawLineEx({ TURRENT_1_POSITION.x(), TURRENT_1_POSITION.y() }, { TURRENT_1_TARGET.x(), TURRENT_1_TARGET.y() }, 1, GREEN);
 }
 
 static void DrawStats()
@@ -316,6 +377,7 @@ int main()
     // Init raylib
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetTargetFPS(60);
     InitWindow(SCREEN_W, SCREEN_H, "FABRIK-C");
 
     agent_texture = LoadTexture("bin/resources/agent_30.png");
@@ -353,6 +415,7 @@ int main()
 
         // SIM STEP
         double t0 = GetTime();
+        UpdateTurrents(GetFrameTime());
         setPreferredVelocities();
         sim->doStep();
         simMs = (GetTime() - t0) * 1000.0;
