@@ -92,6 +92,14 @@
 			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_movement",
 			"working_dir": "${project_path}",
 			"focus": true
+		},
+		{
+			"name": "raylib_bombers_iso.cpp",
+			"target": "terminus_exec",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "cd build && ninja && cd .. && ./bin/raylib_bombers_iso",
+			"working_dir": "${project_path}",
+			"focus": true
 		}
 	],
 	"debugger_tasks": [

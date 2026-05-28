@@ -270,6 +270,7 @@ int main()
         for (std::size_t i = 0; i < totalAgents; ++i)
         {
             std::size_t n = sim->getAgentNumAgentNeighbors(i);
+           
             totalAgentNeighbors += n;
             if (n > maxAgentNeighborsSeen)
                 maxAgentNeighborsSeen = n;
@@ -333,9 +334,9 @@ int main()
         // HUD
         char buf[256];
 #ifdef _OPENMP
-        int  ompThreads = omp_get_max_threads();
+        int ompThreads = omp_get_max_threads();
 #else
-        int  ompThreads = 1;
+        int ompThreads = 1;
 #endif /* _OPENMP */
         snprintf(
         buf,
